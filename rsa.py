@@ -27,12 +27,15 @@ def normalise(mat, axis):
         return new_matrix
 
 # make all the listener and speakers
-def make_agents(M):
+def make_agents(M, prag=True):
     S0 = normalise(M, 1)
     L0 = normalise(M, 0)
-    S1 = normalise(L0, 1)
-    L1 = normalise(S1, 0)
-    return S0, L0, S1, L1
+    if prag:
+        S1 = normalise(L0, 1)
+        L1 = normalise(S1, 0)
+        return S0, L0, S1, L1
+    else:
+        return S0, L0
 
 # compute P(w'= w) = integrate_u Pspeak(u | w) Plisten(w' | u)
 def comm_acc(S,L):

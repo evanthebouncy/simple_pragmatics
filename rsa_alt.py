@@ -3,6 +3,7 @@ import random
 from semantics import *
 import numpy as np
 from tqdm import tqdm
+import pandas as pd
 
 # sample a random 1-hot array
 def get_random_1hot(n):
@@ -16,15 +17,22 @@ def get_AG(U):
     alt_mat = [get_random_1hot(len(U)) for _ in range(len(U))]
     return alt_mat
 
+def get_multi_AG(U, n_alt=1):
+    # |U| x n_alt x |U|
+    alt_mat = [[get_random_1hot(len(U)) for _ in range(n_alt)] for _ in range(len(U))]
+    return alt_mat
+
 # make the alt listener
 def get_alt_L(U, M, AG):
     def alt_L(u):
         # create the small meaning matrix
         first_row = M[u]
-        second_row = M[AG[u].index(1)]
-        M_smol = np.array([first_row, second_row], dtype='float64')
+        other_rows = M[[a.index(1) for a in AG[u]]] # allows for multiple alts
+        rows = [first_row]
+        rows.extend(other_rows)
+        M_smol = np.array(rows, dtype='float64')
         # get the L1 over the small meaning matrix
-        _,L0,_,_ = rsa.make_agents(M_smol)
+        _,L0  = rsa.make_agents(M_smol, prag=False)
         # need to deal with nastiness of all 0 columns
         S1_alt = np.zeros(L0.shape)
         for h_id in range(M_smol.shape[1]):
@@ -50,11 +58,11 @@ def comm_acc2(S, alt_L, M):
         h_accs.append(h_acc)
     return np.mean(h_accs)
 
-def random_search_AG(U,M,S):
+def random_search_AG(U,M,S, n_alt=1):
     best_acc, best_L_alt = 0, None
     print ("searching for good AG against speaker")
     for i in tqdm(range(100)):
-        AG = get_AG(U)
+        AG = get_multi_AG(U, n_alt=n_alt)
         L_alt = get_alt_L(U,M,AG)
         acc = comm_acc2(S, L_alt, M)
         if acc > best_acc:
@@ -63,29 +71,70 @@ def random_search_AG(U,M,S):
     return best_L_alt, best_acc
 
 if __name__ == '__main__':
-    # consider all binary string up to length 4
-    inputs = rsa.enumerate_inputs(6)
-    # consider all regex up to length 2, sample 25 of them
-    unique_semantics = sample_unique_functions(inputs, 25, func_len=2)
+    # get ready to track data
+    dfs = []
 
-    U, H, M = rsa.make_meaning(inputs, unique_semantics)
-    print ("all utterances\n", U)
-    print ("all hypotheses\n", H)
-    print ("meaning matrix\n", M)
-    print (M.shape)
+    for SEED in range(10):
+        print("="*50)
+        print(f"SEED={SEED}")
+        print("="*50)
+        # set random seed
+        random.seed(SEED)
+        np.random.seed(SEED)
 
-    S0, L0, S1, L1 = rsa.make_agents(M)
-    # rsa.draw(M, 'M')
-    # rsa.draw(S0, 'S0')
-    # rsa.draw(L0, 'L0')
-    # rsa.draw(S1, 'S1')
-    # rsa.draw(L1, 'L1')
+        # consider all binary string up to length 4
+        inputs = rsa.enumerate_inputs(6)
+        # consider all regex up to length 2, sample 25 of them
+        unique_semantics = sample_unique_functions(inputs, 25, func_len=2)
 
-    s0l0 = rsa.comm_acc(S0, L0)
-    s1l0 = rsa.comm_acc(S1, L0)
-    s1l1 = rsa.comm_acc(S1, L1)
-    print (f"communication accuracies S0-L0 {s0l0} S1-L0 {s1l0} S1-L1 {s1l1}")
+        U, H, M = rsa.make_meaning(inputs, unique_semantics)
+        print ("all utterances\n", U)
+        print ("all hypotheses\n", H)
+        print ("meaning matrix\n", M)
+        print (M.shape)
 
-    ######## new code below this line ########
-    L_alt, best_acc = random_search_AG(U,M,S1)
-    print (f"communication accuracy S1-L_alt {best_acc}")
+        S0, L0, S1, L1 = rsa.make_agents(M)
+        # rsa.draw(M, 'M')
+        # rsa.draw(S0, 'S0')
+        # rsa.draw(L0, 'L0')
+        # rsa.draw(S1, 'S1')
+        # rsa.draw(L1, 'L1')
+
+        accs = dict(acc=[], agent=[], n_alt=[])
+
+        s0l0 = rsa.comm_acc(S0, L0)
+        s1l0 = rsa.comm_acc(S1, L0)
+        s1l1 = rsa.comm_acc(S1, L1)
+        print (f"communication accuracies S0-L0 {s0l0} S1-L0 {s1l0} S1-L1 {s1l1}")
+        accs["acc"] += [s0l0, s1l0, s1l1]
+        accs["agent"] += ["S0-L0", "S1-L0", "S1-L1"]
+        accs["n_alt"] += [0, 0, M.shape[0]]
+
+        ######## new code below this line ########
+        for n in [1, 2, 3, 4, 5, 10, 50, 100]:
+            L_alt, best_acc = random_search_AG(U,M,S1, n_alt=n)
+            print (f"communication accuracy S1-L_alt ({n} alts): {best_acc}")
+            accs["acc"].append(best_acc)
+            accs["agent"].append("S0-L_alt")
+            accs["n_alt"].append(n)
+
+        acc_df = pd.DataFrame(accs)
+        acc_df = acc_df.sort_values(by="n_alt")
+        acc_df["seed"] = SEED
+
+        # add current df to big list of dfs across seeds
+        dfs.append(acc_df)
+    
+    # concatenate all the dfs (1 per seed)
+    df = pd.concat(dfs)
+    print(df.head())
+    df.to_csv("./drawings/acc.csv", index=False)
+
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    sns.set(style="white", font_scale=1.5, palette="pastel")
+    ax = sns.scatterplot(data=df, x="n_alt", y="acc", alpha=0.5)
+    ax = sns.lineplot(data=df, x="n_alt", y="acc", ax=ax)
+    ax.set_xlabel("# alternatives")
+    ax.set_ylabel("communication accuracy")
+    plt.savefig("./drawings/acc.png", bbox_inches="tight")
