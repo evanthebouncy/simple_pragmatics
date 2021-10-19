@@ -4,6 +4,7 @@ from semantics import *
 import numpy as np
 from tqdm import tqdm
 import pandas as pd
+from plot import plot_acc_vs_nalt
 
 # sample a random 1-hot array
 def get_random_1hot(n):
@@ -74,7 +75,7 @@ if __name__ == '__main__':
     # get ready to track data
     dfs = []
 
-    for SEED in range(10):
+    for SEED in range(11):
         print("="*50)
         print(f"SEED={SEED}")
         print("="*50)
@@ -111,11 +112,11 @@ if __name__ == '__main__':
         accs["n_alt"] += [0, 0, M.shape[0]]
 
         ######## new code below this line ########
-        for n in [1, 2, 3, 4, 5, 10, 50, 100]:
+        for n in range(1, M.shape[0]+1, 1):
             L_alt, best_acc = random_search_AG(U,M,S1, n_alt=n)
             print (f"communication accuracy S1-L_alt ({n} alts): {best_acc}")
             accs["acc"].append(best_acc)
-            accs["agent"].append("S0-L_alt")
+            accs["agent"].append("S1-L_alt")
             accs["n_alt"].append(n)
 
         acc_df = pd.DataFrame(accs)
@@ -130,11 +131,4 @@ if __name__ == '__main__':
     print(df.head())
     df.to_csv("./drawings/acc.csv", index=False)
 
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    sns.set(style="white", font_scale=1.5, palette="pastel")
-    ax = sns.scatterplot(data=df, x="n_alt", y="acc", alpha=0.5)
-    ax = sns.lineplot(data=df, x="n_alt", y="acc", ax=ax)
-    ax.set_xlabel("# alternatives")
-    ax.set_ylabel("communication accuracy")
-    plt.savefig("./drawings/acc.png", bbox_inches="tight")
+    plot_acc_vs_nalt(df)
