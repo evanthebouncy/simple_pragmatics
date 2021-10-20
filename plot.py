@@ -6,7 +6,7 @@ def plot_acc_vs_nalt(df, outpath="./drawings/acc.png"):
     sns.set(style="white", font_scale=1.5, palette="pastel")
 
     # ax = sns.scatterplot(data=df[df.agent.str.contains("L_alt")], x="n_alt", y="acc", alpha=0.5)
-    ax = sns.lineplot(data=df[df.agent.str.contains("L_alt")], x="n_alt", y="acc")
+    ax = sns.lineplot(data=df[df.agent.str.contains("L_alt")], x="n_alt", y="acc", hue="AG_type")
 
     # add horizontal lines for S0-L0, S1-L0, and S1-L1
     for agent in ["S0-L0", "S1-L0", "S1-L1"]:
@@ -20,5 +20,11 @@ def plot_acc_vs_nalt(df, outpath="./drawings/acc.png"):
     plt.savefig(outpath, bbox_inches="tight")
 
 if __name__ == "__main__":
-    df = pd.read_csv("./drawings/acc.csv")
-    plot_acc_vs_nalt(df)
+    df_seq = pd.read_csv("./drawings/acc_sequential.csv")
+    df_rand = pd.read_csv("./drawings/acc_random.csv")
+
+    df_seq["AG_type"] = "sequential"
+    df_rand["AG_type"] = "random"
+
+    df = pd.concat([df_seq, df_rand])
+    plot_acc_vs_nalt(df, outpath="./drawings/acc_combined.png")
