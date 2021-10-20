@@ -23,6 +23,13 @@ def get_multi_AG(U, n_alt=1):
     alt_mat = [[get_random_1hot(len(U)) for _ in range(n_alt)] for _ in range(len(U))]
     return alt_mat
 
+def add_AG_rows(alt_mat, U, n_alt):
+    # get number of rows to add (n_alt - # rows from original AG matrix)
+    n_rows = n_alt - len(alt_mat[0])
+    # add random rows to existing AG matrix
+    alt_mat = [row + [get_random_1hot(len(U)) for _ in range(n_rows)] for row in alt_mat]
+    return alt_mat
+
 # make the alt listener
 def get_alt_L(U, M, AG):
     def alt_L(u):
@@ -59,17 +66,23 @@ def comm_acc2(S, alt_L, M):
         h_accs.append(h_acc)
     return np.mean(h_accs)
 
-def random_search_AG(U,M,S, n_alt=1):
-    best_acc, best_L_alt = 0, None
+def random_search_AG(U,M,S, AG=None, n_alt=1):
+    best_acc, best_L_alt, best_AG = 0, None, None
     print ("searching for good AG against speaker")
     for i in tqdm(range(100)):
-        AG = get_multi_AG(U, n_alt=n_alt)
+        if AG is None:
+            # if no AG specified, then generate from scratch
+            AG = get_multi_AG(U, n_alt=n_alt)
+        else:
+            # add random rows to existing AG
+            AG = add_AG_rows(AG, U, n_alt=n_alt)
         L_alt = get_alt_L(U,M,AG)
         acc = comm_acc2(S, L_alt, M)
         if acc > best_acc:
             best_acc = acc
             best_L_alt = L_alt
-    return best_L_alt, best_acc
+            best_AG = AG
+    return best_L_alt, best_acc, best_AG
 
 if __name__ == '__main__':
     # get ready to track data
@@ -112,8 +125,9 @@ if __name__ == '__main__':
         accs["n_alt"] += [0, 0, M.shape[0]]
 
         ######## new code below this line ########
+        AG = None
         for n in range(1, M.shape[0]+1, 1):
-            L_alt, best_acc = random_search_AG(U,M,S1, n_alt=n)
+            L_alt, best_acc, AG = random_search_AG(U,M,S1, AG=AG, n_alt=n)
             print (f"communication accuracy S1-L_alt ({n} alts): {best_acc}")
             accs["acc"].append(best_acc)
             accs["agent"].append("S1-L_alt")
@@ -129,6 +143,6 @@ if __name__ == '__main__':
     # concatenate all the dfs (1 per seed)
     df = pd.concat(dfs)
     print(df.head())
-    df.to_csv("./drawings/acc.csv", index=False)
+    df.to_csv("./drawings/acc_greedy.csv", index=False)
 
-    plot_acc_vs_nalt(df)
+    plot_acc_vs_nalt(df, outpath="./drawings/acc_greedy.png")
