@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def plot_acc_vs_nalt(df):
+def plot_acc_vs_nalt(df, outpath="./drawings/acc.png"):
     sns.set(style="white", font_scale=1.5, palette="pastel")
 
     # ax = sns.scatterplot(data=df[df.agent.str.contains("L_alt")], x="n_alt", y="acc", alpha=0.5)
@@ -17,7 +17,7 @@ def plot_acc_vs_nalt(df):
     # edit labels and save
     ax.set_xlabel("# alternatives")
     ax.set_ylabel("communication accuracy")
-    plt.savefig("./drawings/acc.png", bbox_inches="tight")
+    plt.savefig(outpath, bbox_inches="tight")
 
 if __name__ == "__main__":
     df = pd.read_csv("./drawings/acc.csv")
