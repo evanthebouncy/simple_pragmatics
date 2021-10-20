@@ -85,10 +85,11 @@ def random_search_AG(U,M,S, AG=None, n_alt=1):
     return best_L_alt, best_acc, best_AG
 
 if __name__ == '__main__':
+    greedy = True # whether or not to generate AG sequentially
     # get ready to track data
     dfs = []
 
-    for SEED in range(11):
+    for SEED in range(10):
         print("="*50)
         print(f"SEED={SEED}")
         print("="*50)
@@ -126,7 +127,10 @@ if __name__ == '__main__':
 
         ######## new code below this line ########
         AG = None
-        for n in range(1, M.shape[0]+1, 1):
+        for n in range(1, M.shape[0]+1, 50):
+            if not greedy:
+                # reset AG each time if we aren't constructing it greedily
+                AG = None
             L_alt, best_acc, AG = random_search_AG(U,M,S1, AG=AG, n_alt=n)
             print (f"communication accuracy S1-L_alt ({n} alts): {best_acc}")
             accs["acc"].append(best_acc)
@@ -143,6 +147,6 @@ if __name__ == '__main__':
     # concatenate all the dfs (1 per seed)
     df = pd.concat(dfs)
     print(df.head())
-    df.to_csv("./drawings/acc_greedy.csv", index=False)
+    df.to_csv(f"./drawings/acc{'_greedy' if greedy else ''}.csv", index=False)
 
-    plot_acc_vs_nalt(df, outpath="./drawings/acc_greedy.png")
+    plot_acc_vs_nalt(df, outpath=f"./drawings/acc{'_greedy' if greedy else ''}.png")
