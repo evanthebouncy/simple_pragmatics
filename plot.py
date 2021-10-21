@@ -1,30 +1,50 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from os import listdir
 
-def plot_acc_vs_nalt(df, outpath="./drawings/acc.png"):
-    sns.set(style="white", font_scale=1.5, palette="pastel")
+# global style
+sns.set(style="white", font_scale=1.5, palette="pastel")
 
-    # ax = sns.scatterplot(data=df[df.agent.str.contains("L_alt")], x="n_alt", y="acc", alpha=0.5)
-    ax = sns.lineplot(data=df[df.agent.str.contains("L_alt")], x="n_alt", y="acc", hue="AG_type")
+def render(outpath):
+    plt.savefig(outpath, bbox_inches="tight")
+    print(f"Saved figure to {outpath}")
+
+def plot_utility_vs_nalt(df, by_seed=False, metric="utility", outpath="./drawings/utility_raw.png"):
+    nU = df.n_alt.max()
+    kwargs = dict(x="n_alt", y=metric, hue="AG_type")
+
+    if by_seed:
+        for seed in df.seed.unique():
+            sub = df[df.seed==seed]
+            ax = sns.lineplot(data=sub[sub.agent.str.contains("L_alt")], legend=False, **kwargs)
+    else:
+        ax = sns.lineplot(data=df[df.agent.str.contains("L_alt")], **kwargs)
 
     # add horizontal lines for S0-L0, S1-L0, and S1-L1
     for agent in ["S0-L0", "S1-L0", "S1-L1"]:
-        mean_acc = df[df.agent==agent].acc.mean()
-        ax.axhline(mean_acc, linestyle="--", color="k", alpha=0.5)
-        ax.text(115, mean_acc+0.003, agent, size="x-small")
+        mean = df[df.agent==agent][metric].mean()
+        ax.axhline(mean, linestyle="--", color="k", alpha=0.5)
+        ax.text(nU - (nU*0.1), mean+0.003, agent, size="x-small")
 
     # edit labels and save
     ax.set_xlabel("# alternatives")
-    ax.set_ylabel("communication accuracy")
-    plt.savefig(outpath, bbox_inches="tight")
+    ax.set_ylabel(metric)
+    render(outpath)
 
 if __name__ == "__main__":
-    df_seq = pd.read_csv("./drawings/acc_sequential.csv")
-    df_rand = pd.read_csv("./drawings/acc_random.csv")
+    # gather data
+    all_dfs = []
+    AG_types = ["greedy", "random", "sequential"]
+    for AG_type in AG_types:
+        dfs = [pd.read_csv(f"./data/{AG_type}/{f}") for f in listdir(f"./data/{AG_type}")]
+        for df in dfs:
+            df["AG_type"] = AG_type
+        all_dfs += dfs
+    df = pd.concat(all_dfs)
+    df.to_csv("./data/utility.csv", index=False)
 
-    df_seq["AG_type"] = "sequential"
-    df_rand["AG_type"] = "random"
-
-    df = pd.concat([df_seq, df_rand])
-    plot_acc_vs_nalt(df, outpath="./drawings/acc_combined.png")
+    # generate plots
+    plot_utility_vs_nalt(df, metric="utility", outpath="./drawings/utility_raw.png")
+    plt.clf()
+    plot_utility_vs_nalt(df, metric="utility_ratio", outpath="./drawings/utility_ratio.png")

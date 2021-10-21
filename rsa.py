@@ -1,6 +1,7 @@
 from semantics import *
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.special import xlogy
 
 # take in the set of enumerated inputs and the semantics
 # set of utterances, set of hypotheses, the meaning matrix M
@@ -41,6 +42,12 @@ def make_agents(M, prag=True):
 def comm_acc(S,L):
     w_to_w = (S*L).sum(axis=0)
     return w_to_w.mean()
+
+def utility(S, L):
+   # assumes uniform prior
+   nM = S.shape[1]
+   utility = np.sum(xlogy(S,L)) / nM
+   return utility
 
 def draw(x, name):
     plt.imshow(x, cmap='gray')
