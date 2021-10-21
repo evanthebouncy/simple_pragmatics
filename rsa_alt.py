@@ -141,10 +141,10 @@ if __name__ == '__main__':
     print(f"SEED={SEED}") 
     random.seed(SEED)
     np.random.seed(SEED)
-    n_attempt = 10
+    n_attempt = 100
 
     # consider all binary string up to length 6
-    inputs = rsa.enumerate_inputs(4)
+    inputs = rsa.enumerate_inputs(6)
     # consider all regex up to length 2, sample 25 of them
     unique_semantics = sample_unique_functions(inputs, 25, func_len=2)
 
