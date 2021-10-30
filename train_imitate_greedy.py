@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-# from torch.nn.functional import one_hot
 import argparse
 import os
 import logging
@@ -13,6 +12,8 @@ import pandas as pd
 from copy import deepcopy
 
 from model import AG
+
+MAX_N_ALT = 20
 
 def train():
     criterion = nn.CrossEntropyLoss()
@@ -29,7 +30,7 @@ def train():
         u = np.random.choice(range(nU), p=S1_dist)
 
         # randomly sample n (number of previous alternatives)
-        n = np.random.randint(1, 10)
+        n = np.random.randint(1, MAX_N_ALT)
         # get previous alternatives from greedy AG for n
         prev_alts = torch.tensor(greedy_AG[n][u]).to(device)
         # get greedy AG prediction at n+1 as target
@@ -39,7 +40,8 @@ def train():
         L0_prev = torch.from_numpy(L0[prev_alts]).float()
         if n == 1:
             L0_prev = L0_prev.unsqueeze(0)
-        inpt = torch.cat([L0_u, L0_prev], dim=0).unsqueeze(0).to(device)
+        # put u last so model doesn't have to keep track of long dependency
+        inpt = torch.cat([L0_prev, L0_u], dim=0).unsqueeze(0).to(device) 
 
         # forward pass
         logits = model(inpt)
@@ -52,9 +54,12 @@ def train():
         # save checkpoint
         torch.save((model, opt), args.ckpt)
 
-        # also compute utility, because why not?
-        _, utility, _ = evaluate(model, n)
-        logger.info(f"Step {t}: n_prev_alt={n}, loss={loss.item()}, utility={utility}")
+        # log progress at specified interval
+        utility = None
+        if t % 100 == 0:
+            # can evaluate utility if you want, but it slows things down
+            # _, utility, _ = evaluate(model, n)
+            logger.info(f"Step {t}: n_prev_alt={n}, loss={loss.item()}, utility={utility}")
         rsa_alt.write_line(f"{t},{n},{loss.item()},{utility},{args.seed}", loss_file)
     logger.info("Finished training")
 
@@ -68,7 +73,7 @@ def evaluate(model, n):
             # create inputs by feeding u and prev_alts to L0
             L0_u = torch.from_numpy(L0[u]).unsqueeze(0).float()
             L0_prev = torch.from_numpy(L0[prev_alts]).float()
-            inpt = torch.cat([L0_u, L0_prev]).unsqueeze(0).to(device)
+            inpt = torch.cat([L0_prev, L0_u]).unsqueeze(0).to(device)
             logits = model(inpt)
             pred_alt = logits.argmax().item()
             AG_mat[u].append(pred_alt)
@@ -152,11 +157,11 @@ if __name__ == "__main__":
     greedy_df = pd.read_csv(f"./data/greedy/utility_{args.seed}.csv")
     greedy_utility = {
         k: greedy_df[(greedy_df.n_alt==k)&(greedy_df.agent=="S1-L_alt")].utility.values[0]
-        for k in range(1, 120, 1)
+        for k in range(1, MAX_N_ALT+1, 1)
     }
     greedy_AG = {
         k: eval(greedy_df[(greedy_df.n_alt==k)&(greedy_df.agent=="S1-L_alt")].alt_mat.values[0])
-        for k in range(1, 120, 1)
+        for k in range(1, MAX_N_ALT+1, 1)
     }
         
     # Load model and optimizer checkpoints if specified.
@@ -180,15 +185,15 @@ if __name__ == "__main__":
 
     # Use the learned model to generate alts for L1, and evaluate utility.
     model, _ = torch.load(args.ckpt, map_location=device)
-    L_alt, utility, AG_mat = evaluate(model, 20)
-    logger.info(f"Final utility of learned AG: {utility}")
-    logger.info(f"Utility of greedy AG: {greedy_utility[20]}")
-    mask = torch.tensor(greedy_AG[20]).eq(torch.tensor(AG_mat))
-    n_agree = sum(mask).item()
-    total = mask.numel()
-    prop_agree = n_agree / total
-    logger.info(f"Agreement btwn greedy & learned AG: {n_agree}/{total}={prop_agree}")
-    logger.info("Greedy AG:")
-    logger.info(greedy_AG)
-    logger.info("Learned AG:")
-    logger.info(AG_mat)
+    test_file = os.path.join(args.save, "test-utility.csv")
+    rsa_alt.write_line("n_prev_alt,utility,AG_type,prop_agree_greedy,seed", test_file)
+    for n in range(1, MAX_N_ALT, 1):
+        greedy = torch.tensor(greedy_AG[n+1])
+        L_alt, utility, AG_mat = evaluate(model, n)
+        # hacky: compare only the last column, which is the "added" alt
+        AG_mat = torch.tensor(AG_mat)
+        assert greedy.size(1) == AG_mat.size(1)
+        agree_mask = greedy[:,-1].eq(AG_mat[:,-1])
+        prop_agree = agree_mask.sum().item() / agree_mask.numel()
+        rsa_alt.write_line(f"{n},{utility},learned,{prop_agree},{args.seed}", test_file)
+        rsa_alt.write_line(f"{n},{greedy_utility[n+1]},greedy,1.0,{args.seed}", test_file)
