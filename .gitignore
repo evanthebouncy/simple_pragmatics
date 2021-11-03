@@ -1,4 +1,5 @@
 # large files
+runs/
 data/utility.csv
 
 # Byte-compiled / optimized / DLL files
