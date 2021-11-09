@@ -39,7 +39,7 @@ def plot_utility_vs_nalt(df, by_seed=False, x="n_alt", metric="utility", outpath
 if __name__ == "__main__":
     # gather data
     all_dfs = []
-    AG_types = ["greedy", "random", "sequential"]
+    AG_types = ["global", "greedy", "random", "sequential"]
     for AG_type in AG_types:
         dfs = [pd.read_csv(f"./data/{AG_type}/{f}") for f in listdir(f"./data/{AG_type}")]
         for df in dfs:

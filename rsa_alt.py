@@ -65,6 +65,15 @@ def add_AG_rows_greedy(alt_mat, U, M, S):
         alt_mat[u_id] += [best_a] # actually extend with best option
     return alt_mat
 
+# global alts (alts are the same for each u)
+def get_global_random_AG(U, n_alt=1):
+    # AG is represented as list of numpy arrays: |U| x n_alt
+    nU = len(U)
+    global_alts = sample_unique(range(nU), n_alt)
+    # it's ok if u is an alternative to itself (TODO: address this)
+    alt_mat = [global_alts for _ in range(nU)]
+    return alt_mat
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # constructing AG-based listener
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -126,6 +135,20 @@ def greedy_search_AG(U, M, S, AG=None):
     utility = rsa.utility(S, matrixify(L_alt, U))
     return L_alt, utility, AG
 
+def global_random_search_AG(U, M, S, n_alt=1, n_attempt=100):
+    print ("searching for good *global* AG against speaker")
+    best_utility, best_L_alt, best_AG = -np.inf, None, None
+    for _ in tqdm(range(n_attempt)):
+        # generate from scratch (each row is the same)
+        cur_AG = get_global_random_AG(U, n_alt=n_alt)
+        L_alt = get_alt_L(M, cur_AG) # lazy function
+        utility = rsa.utility(S, matrixify(L_alt, U))
+        if utility > best_utility:
+            best_utility = utility
+            best_L_alt = L_alt
+            best_AG = cur_AG
+    return best_L_alt, best_utility, best_AG
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # driver code
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,7 +157,7 @@ if __name__ == '__main__':
     # example usage: python rsa_alt.py greedy 1111
     AG_type = sys.argv[1]
     SEED = int(sys.argv[2])
-    assert AG_type in ["greedy", "sequential", "random"] 
+    assert AG_type in ["greedy", "sequential", "random", "global"] 
     outfile = f"./data/{AG_type}/utility_{SEED}.csv"
     
     # set random seed
@@ -172,11 +195,14 @@ if __name__ == '__main__':
     # perform specified algorithm to build AG
     AG = None
     import time
-    for n in range(1, M.shape[0], 1): # max # alts is |U|-1, since u is not an alt to itself
+    for n in range(1, 10, 1): #M.shape[0], 1): # max # alts is |U|-1, since u is not an alt to itself
         start = time.time()
         if AG_type == "greedy":
             # construct AG row-by-row in greedy fashion
             L_alt, utility, AG = greedy_search_AG(U, M, S1, AG=AG)
+        elif AG_type == "global":
+            # construct best global set of alternatives (independent of u)
+            L_alt, utility, AG = global_random_search_AG(U, M, S1, n_alt=n, n_attempt=n_attempt)
         else: 
             L_alt, utility, AG = random_search_AG(
                 U, M, S1, sequential=(AG_type=="sequential"), AG=AG, n_alt=n, n_attempt=n_attempt
