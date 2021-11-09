@@ -195,7 +195,7 @@ if __name__ == '__main__':
     # perform specified algorithm to build AG
     AG = None
     import time
-    for n in range(1, 10, 1): #M.shape[0], 1): # max # alts is |U|-1, since u is not an alt to itself
+    for n in range(1, M.shape[0], 1): # max # alts is |U|-1, since u is not an alt to itself
         start = time.time()
         if AG_type == "greedy":
             # construct AG row-by-row in greedy fashion
