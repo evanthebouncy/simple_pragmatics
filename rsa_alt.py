@@ -73,7 +73,10 @@ def add_AG_rows_greedy(alt_mat, U, M, S):
 def get_alt_L(M, AG):
     def alt_L(u):
         # create the small meaning matrix: rows corresponding to observed u + alts of u
-        M_smol = np.concatenate([[M[u]], M[AG[u]]]).astype(np.float64)
+        try:
+            M_smol = np.concatenate([[M[u]], M[AG[u]]]).astype(np.float64)
+        except:
+            M_smol = np.concatenate([[M[u]], [M[AG[u]]]]).astype(np.float64)
         
         # get the L0, S1, and L1 over the small meaning matrix
         _, L0_smol  = rsa.make_agents(M_smol, prag=False)
